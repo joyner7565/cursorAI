@@ -1,0 +1,6 @@
+com/adobe/livecycle/watermark/api/PDFFile.class
+com/adobe/livecycle/watermark/api/WatermarkUtils.class
+com/adobe/livecycle/watermark/InvisibleWatermarkTool.class
+com/adobe/livecycle/watermark/api/DecodeWatermark.class
+com/adobe/livecycle/watermark/api/EncodeWatermark.class
+com/adobe/livecycle/watermark/App.class
