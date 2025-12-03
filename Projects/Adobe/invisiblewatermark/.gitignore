@@ -1,17 +1,23 @@
-# macOS system files
+# Maven build artifacts
+target/
+*.jar
+*.class
+
+# Eclipse/IDE files
+.settings/
+.classpath
+.project
+.idea/
+*.iml
+
+# OS files
 .DS_Store
-.localized
+*.swp
+*.swo
 
-# Node.js dependencies
-node_modules/
-
-# Python cache
-__pycache__/
-*.pyc
+# Database files (temporary)
+db.txt
+dbFile.txt
 
 # Logs
 *.log
-
-# Build artifacts
-/dist
-/build

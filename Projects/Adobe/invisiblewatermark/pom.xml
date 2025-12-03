@@ -14,15 +14,16 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <maven.compiler.release>21</maven.compiler.release>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.11</version>
+      <version>4.13.2</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -30,26 +31,21 @@
       <artifactId>pdfbox</artifactId>
       <version>3.0.1</version>
     </dependency>
+    <!-- Adobe JARs - Install to local repo using ./install-adobe-jars.sh -->
     <dependency>
         <groupId>com.adobe.internal</groupId>
         <artifactId>pdfcore</artifactId>
         <version>1.0</version>
-        <scope>system</scope>
-        <systemPath>${project.basedir}/libs/pdfcore.jar</systemPath>
     </dependency>
     <dependency>
         <groupId>com.adobe.internal</groupId>
         <artifactId>pdfservices</artifactId>
         <version>1.0</version>
-        <scope>system</scope>
-        <systemPath>${project.basedir}/libs/pdfservices.jar</systemPath>
     </dependency>
     <dependency>
         <groupId>com.adobe.internal</groupId>
         <artifactId>rideau</artifactId>
         <version>1.0</version>
-        <scope>system</scope>
-        <systemPath>${project.basedir}/libs/rideau.jar</systemPath>
     </dependency>
   </dependencies>
   <build>
@@ -67,15 +63,74 @@
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.0</version>
+          <version>3.11.0</version>
+          <configuration>
+            <source>21</source>
+            <target>21</target>
+            <release>21</release>
+          </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.22.1</version>
+          <version>3.2.2</version>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
           <version>3.0.2</version>
+          <configuration>
+            <archive>
+              <manifest>
+                <addClasspath>true</addClasspath>
+                <classpathPrefix>libs/</classpathPrefix>
+                <mainClass>com.adobe.livecycle.watermark.InvisibleWatermarkTool</mainClass>
+              </manifest>
+              <manifestEntries>
+                <Class-Path>libs/pdfcore.jar libs/pdfservices.jar libs/rideau.jar</Class-Path>
+              </manifestEntries>
+            </archive>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.6.0</version>
+          <executions>
+            <execution>
+              <id>copy-dependencies</id>
+              <phase>package</phase>
+              <goals>
+                <goal>copy-dependencies</goal>
+              </goals>
+              <configuration>
+                <outputDirectory>${project.build.directory}/libs</outputDirectory>
+                <includeScope>runtime</includeScope>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>3.6.0</version>
+          <configuration>
+            <descriptors>
+              <descriptor>src/main/assembly/jar-with-dependencies.xml</descriptor>
+            </descriptors>
+            <archive>
+              <manifest>
+                <mainClass>com.adobe.livecycle.watermark.InvisibleWatermarkTool</mainClass>
+              </manifest>
+            </archive>
+          </configuration>
+          <executions>
+            <execution>
+              <id>make-assembly</id>
+              <phase>package</phase>
+              <goals>
+                <goal>single</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <artifactId>maven-install-plugin</artifactId>
