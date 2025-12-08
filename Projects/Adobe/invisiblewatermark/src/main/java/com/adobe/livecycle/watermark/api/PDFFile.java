@@ -1,109 +1,119 @@
 package com.adobe.livecycle.watermark.api;
 
-import com.adobe.internal.io.ByteArrayByteWriter;
-import com.adobe.internal.io.ByteReader;
-import com.adobe.internal.io.ByteWriter;
-import com.adobe.internal.io.InputStreamByteReader;
-import com.adobe.internal.io.RandomAccessFileByteWriter;
-import com.adobe.internal.pdftoolkit.pdf.content.Content;
-import com.adobe.internal.pdftoolkit.pdf.content.ContentReader;
-import com.adobe.internal.pdftoolkit.pdf.document.PDFDocument;
-import com.adobe.internal.pdftoolkit.pdf.document.PDFOpenOptions;
-import com.adobe.internal.pdftoolkit.pdf.document.PDFSaveIncrementalOptions;
-import com.adobe.internal.pdftoolkit.pdf.document.PDFSaveOptions;
-import com.adobe.internal.pdftoolkit.pdf.page.PDFPage;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDDocumentInformation;
+import org.apache.pdfbox.pdmodel.PDPage;
+
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
 
+/**
+ * PDFBox-based PDF file wrapper for watermarking operations
+ */
 public class PDFFile {
-    private PDFDocument pdfDoc = null;
+    private PDDocument document;
+    private String filePath;
 
-    public PDFFile(String inputPDFPath) throws Exception {
+    /**
+     * Load PDF from file path
+     */
+    public PDFFile(String inputPDFPath) throws IOException {
+        this.filePath = inputPDFPath;
         var file = new File(inputPDFPath);
-        var fis = new FileInputStream(file);
-        var inputStreamByteReader = new InputStreamByteReader(fis);
-        
-        this.pdfDoc = PDFDocument.newInstance((ByteReader)inputStreamByteReader, PDFOpenOptions.newInstance());
-        
-        inputStreamByteReader.close();
-        fis.close();
+        this.document = Loader.loadPDF(file);
     }
 
-    public PDFFile(InputStream inputPDFStream) throws Exception {
-        var inputStreamByteReader = new InputStreamByteReader(inputPDFStream);
-        
-        this.pdfDoc = PDFDocument.newInstance((ByteReader)inputStreamByteReader, PDFOpenOptions.newInstance());
-        inputStreamByteReader.close();
+    /**
+     * Load PDF from input stream
+     */
+    public PDFFile(InputStream inputPDFStream) throws IOException {
+        this.document = Loader.loadPDF(inputPDFStream.readAllBytes());
     }
 
-    public void close() throws Exception {
-        if (this.pdfDoc != null) {
-            this.pdfDoc.close();
+    /**
+     * Create from existing PDDocument
+     */
+    public PDFFile(PDDocument document) {
+        this.document = document;
+    }
+
+    /**
+     * Get the underlying PDDocument
+     */
+    public PDDocument getDocument() {
+        return document;
+    }
+
+    /**
+     * Close the PDF document
+     */
+    public void close() throws IOException {
+        if (this.document != null) {
+            this.document.close();
         }
     }
 
-    public PDFPage getPage(int pageNum) throws Exception {
-        return this.pdfDoc.requirePages().getPage(pageNum);
+    /**
+     * Get a specific page
+     */
+    public PDPage getPage(int pageNum) throws Exception {
+        if (pageNum < 0 || pageNum >= getNumPages()) {
+            throw new Exception("Invalid page number: " + pageNum);
+        }
+        return this.document.getPage(pageNum);
     }
 
-    public void setPageContent(int pageNum, Content newPageContent) throws Exception {
-        getPage(pageNum).setContents(newPageContent.getContentStream());
-    }
-
-    public void setPageContent(PDFPage pdfPage, Content newPageContent) throws Exception {
-        pdfPage.setContents(newPageContent.getContentStream());
-    }
-
-    public ContentReader getPageContentReader(int pageNum) throws Exception {
-        var content = Content.newInstance(getPage(pageNum));
-        return ContentReader.newInstance(content);
-    }
-
-    public void saveAsAndClose(String outputPDFPath) throws Exception {
+    /**
+     * Save to a new file and close
+     */
+    public void saveAsAndClose(String outputPDFPath) throws IOException {
         var outputFile = new File(outputPDFPath);
-        if (outputFile.exists()) {
-            outputFile.delete();
-        } else {
-            var parentDir = new File(outputFile.getParent());
-            parentDir.mkdir();
+        
+        // Create parent directory if needed
+        if (outputFile.getParentFile() != null && !outputFile.getParentFile().exists()) {
+            outputFile.getParentFile().mkdirs();
         }
-
-        var outputPdfFile = new RandomAccessFile(outputPDFPath, "rw");
-        var randomAccessFileByteWriter = new RandomAccessFileByteWriter(outputPdfFile);
         
-        this.pdfDoc.saveAndClose((ByteWriter)randomAccessFileByteWriter, (PDFSaveOptions)PDFSaveIncrementalOptions.newInstance());
-        
-        randomAccessFileByteWriter.close();
-        outputPdfFile.close();
-        
-        this.pdfDoc.close();
-        this.pdfDoc = null;
+        // Save the document
+        this.document.save(outputFile);
+        this.document.close();
+        this.document = null;
     }
 
-    public byte[] getFileContentsAndClose() throws Exception {
-        var byteWriter = new ByteArrayByteWriter();
-
-        this.pdfDoc.save((ByteWriter)byteWriter, (PDFSaveOptions)PDFSaveIncrementalOptions.newInstance());
-        this.pdfDoc.close();
-        this.pdfDoc = null;
-        return byteWriter.toByteArray();
-    }
-
-    public int getNumRevisions() {
-        return this.pdfDoc.getNumRevisions();
-    }
-
-    public String getDocTitle() throws Exception {
-        return this.pdfDoc.getDocumentInfo().getTitle();
-    }
-
-    public String getDocSubject() throws Exception {
-        return this.pdfDoc.getDocumentInfo().getSubject();
-    }
-
+    /**
+     * Get number of pages
+     */
     public int getNumPages() throws Exception {
-        return this.pdfDoc.requirePages().getNumPages();
+        return this.document.getNumberOfPages();
+    }
+
+    /**
+     * Get document title from metadata
+     */
+    public String getDocTitle() throws Exception {
+        PDDocumentInformation info = this.document.getDocumentInformation();
+        String title = info.getTitle();
+        
+        // If no title in metadata, use filename
+        if (title == null || title.isEmpty()) {
+            if (filePath != null) {
+                var file = new File(filePath);
+                title = file.getName();
+            } else {
+                title = "Untitled";
+            }
+        }
+        
+        return title;
+    }
+
+    /**
+     * Get document subject from metadata
+     */
+    public String getDocSubject() throws Exception {
+        PDDocumentInformation info = this.document.getDocumentInformation();
+        return info.getSubject();
     }
 }

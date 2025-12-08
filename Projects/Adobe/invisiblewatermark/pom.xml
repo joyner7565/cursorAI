@@ -26,26 +26,21 @@
       <version>4.13.2</version>
       <scope>test</scope>
     </dependency>
+    <!-- Apache PDFBox - Open source PDF library -->
     <dependency>
       <groupId>org.apache.pdfbox</groupId>
       <artifactId>pdfbox</artifactId>
       <version>3.0.1</version>
     </dependency>
-    <!-- Adobe JARs - Install to local repo using ./install-adobe-jars.sh -->
     <dependency>
-        <groupId>com.adobe.internal</groupId>
-        <artifactId>pdfcore</artifactId>
-        <version>1.0</version>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>fontbox</artifactId>
+      <version>3.0.1</version>
     </dependency>
     <dependency>
-        <groupId>com.adobe.internal</groupId>
-        <artifactId>pdfservices</artifactId>
-        <version>1.0</version>
-    </dependency>
-    <dependency>
-        <groupId>com.adobe.internal</groupId>
-        <artifactId>rideau</artifactId>
-        <version>1.0</version>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
+      <version>1.2</version>
     </dependency>
   </dependencies>
   <build>
