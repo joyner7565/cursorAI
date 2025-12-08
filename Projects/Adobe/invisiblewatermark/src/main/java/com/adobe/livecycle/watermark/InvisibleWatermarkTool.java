@@ -163,7 +163,8 @@ public class InvisibleWatermarkTool {
         
         var encoder = new EncodeWatermark();
         
-        int wmBitsLength = 10;
+        // 2^20 = 1,048,576 unique codes (sufficient for 1M users)
+        int wmBitsLength = 20;
         
         boolean isWmBitsUnique = false;
         String wmBits = "";

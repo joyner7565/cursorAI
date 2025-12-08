@@ -1,16 +1,10 @@
 package com.adobe.livecycle.watermark.api;
 
 import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.cos.COSArray;
-import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSFloat;
 import org.apache.pdfbox.cos.COSInteger;
-import org.apache.pdfbox.cos.COSName;
-import org.apache.pdfbox.cos.COSNumber;
-import org.apache.pdfbox.cos.COSString;
 import org.apache.pdfbox.pdmodel.PDPage;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -92,7 +86,7 @@ public class EncodeWatermark {
             }
             
             // Write modified tokens back to page
-            WatermarkUtils.setPageTokens(page, newTokens);
+            WatermarkUtils.setPageTokens(page, newTokens, pdfFile.getDocument());
             
             if (verbose) {
                 System.out.println("Page " + pageNumber + ": " + lineCount + " lines, encoded " + wmBitPos + " bits so far");

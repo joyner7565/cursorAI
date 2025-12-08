@@ -1,22 +1,20 @@
 package com.adobe.livecycle.watermark.api;
 
 import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.cos.COSArray;
-import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSNumber;
 import org.apache.pdfbox.pdmodel.PDPage;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Decodes invisible watermarks from PDF documents using PDFBox
- * Compares original and watermarked PDFs to extract embedded binary data
+ * Looks for the ±0.5 offset Td operators inserted during encoding
  */
 public class DecodeWatermark {
     boolean verbose = false;
-    private static final double EPSILON = 0.1; // Tolerance for float comparison
+    private static final double WATERMARK_OFFSET = 0.5;
+    private static final double EPSILON = 0.3; // Tolerance for detecting watermark
 
     public String decode(PDFFile orgPdfFile, PDFFile wmPdfFile) throws Exception {
         if (orgPdfFile.getNumPages() != wmPdfFile.getNumPages()) {
@@ -27,40 +25,17 @@ public class DecodeWatermark {
         int totalPages = orgPdfFile.getNumPages();
 
         for (int pageNumber = 0; pageNumber < totalPages; pageNumber++) {
-            PDPage orgPage = orgPdfFile.getPage(pageNumber);
             PDPage wmPage = wmPdfFile.getPage(pageNumber);
 
-            // Get line spacings from both documents
-            List<Double> orgSpacings = extractLineSpacings(orgPage);
-            List<Double> wmSpacings = extractLineSpacings(wmPage);
-
-            if (orgSpacings.size() != wmSpacings.size()) {
-                throw new Exception("Error: Different number of lines on page " + pageNumber + 
-                                  " (original: " + orgSpacings.size() + 
-                                  ", watermarked: " + wmSpacings.size() + ")");
+            // Extract watermark bits from this page by looking for our Td offsets
+            List<Character> pageBits = extractWatermarkBits(wmPage);
+            
+            for (Character bit : pageBits) {
+                decodedBits.append(bit);
             }
-
-            // Compare spacings to decode bits
-            for (int i = 0; i < orgSpacings.size() && i < wmSpacings.size(); i++) {
-                double orgSpacing = orgSpacings.get(i);
-                double wmSpacing = wmSpacings.get(i);
-                
-                double difference = wmSpacing - orgSpacing;
-                
-                if (Math.abs(difference) > EPSILON) {
-                    // Detected a watermark bit
-                    if (difference > 0) {
-                        decodedBits.append('1');
-                    } else {
-                        decodedBits.append('0');
-                    }
-                    
-                    if (verbose) {
-                        System.out.println("Page " + pageNumber + ", line " + i + 
-                                         ": difference = " + difference + 
-                                         ", bit = " + decodedBits.charAt(decodedBits.length() - 1));
-                    }
-                }
+            
+            if (verbose) {
+                System.out.println("Page " + pageNumber + ": decoded " + pageBits.size() + " bits");
             }
         }
 
@@ -68,60 +43,53 @@ public class DecodeWatermark {
     }
 
     /**
-     * Extract line spacings from a page's content stream
+     * Extract watermark bits by scanning for the small Td offsets we added
+     * Pattern: COSNumber(0), COSNumber(±0.5), Operator("Td")
      */
-    private List<Double> extractLineSpacings(PDPage page) throws IOException {
-        List<Double> spacings = new ArrayList<>();
-        List<Object> tokens = WatermarkUtils.getPageTokens(page);
+    private List<Character> extractWatermarkBits(PDPage wmPage) throws Exception {
+        List<Character> bits = new ArrayList<>();
         
-        double currentY = 0;
-        double lastY = 0;
-        int lineCount = 0;
+        List<Object> wmTokens = WatermarkUtils.getPageTokens(wmPage);
         
-        for (int i = 0; i < tokens.size(); i++) {
-            Object token = tokens.get(i);
+        // Scan through tokens looking for watermark Td operators
+        for (int i = 0; i < wmTokens.size(); i++) {
+            Object token = wmTokens.get(i);
             
             if (token instanceof Operator) {
                 Operator op = (Operator) token;
                 String opName = op.getName();
                 
-                // Track text positioning
-                if (opName.equals("Td") || opName.equals("TD")) {
-                    // Td/TD: tx ty - Move text position
-                    if (i >= 2 && tokens.get(i-1) instanceof COSNumber && tokens.get(i-2) instanceof COSNumber) {
-                        double ty = ((COSNumber) tokens.get(i-1)).doubleValue();
-                        currentY += ty;
+                // Check if this is a Td operator with watermark pattern
+                if (opName.equals("Td") && i >= 2) {
+                    Object ty = wmTokens.get(i - 1);
+                    Object tx = wmTokens.get(i - 2);
+                    
+                    if (tx instanceof COSNumber && ty instanceof COSNumber) {
+                        float txVal = ((COSNumber) tx).floatValue();
+                        float tyVal = ((COSNumber) ty).floatValue();
                         
-                        double spacing = Math.abs(currentY - lastY);
-                        spacings.add(spacing);
-                        lastY = currentY;
-                    }
-                }
-                else if (opName.equals("Tm")) {
-                    // Tm: a b c d e f - Set text matrix
-                    if (i >= 6 && tokens.get(i-1) instanceof COSNumber) {
-                        double f = ((COSNumber) tokens.get(i-1)).doubleValue();
-                        currentY = f;
-                        
-                        if (lineCount > 0) {
-                            double spacing = Math.abs(currentY - lastY);
-                            spacings.add(spacing);
+                        // Check if this looks like a watermark offset (tx=0, ty=±0.5)
+                        if (Math.abs(txVal) < EPSILON && 
+                            Math.abs(Math.abs(tyVal) - WATERMARK_OFFSET) < EPSILON) {
+                            
+                            // This is a watermark! Decode the bit
+                            if (tyVal > 0) {
+                                bits.add('1');
+                                if (verbose) {
+                                    System.out.println("  Found watermark: ty=" + tyVal + " -> bit=1");
+                                }
+                            } else {
+                                bits.add('0');
+                                if (verbose) {
+                                    System.out.println("  Found watermark: ty=" + tyVal + " -> bit=0");
+                                }
+                            }
                         }
-                        lastY = currentY;
-                        lineCount++;
                     }
-                }
-                else if (isTextShowingOperator(opName)) {
-                    lineCount++;
                 }
             }
         }
         
-        return spacings;
-    }
-    
-    private boolean isTextShowingOperator(String opName) {
-        return opName.equals("Tj") || opName.equals("TJ") || 
-               opName.equals("'") || opName.equals("\"");
+        return bits;
     }
 }
